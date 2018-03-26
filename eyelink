@@ -1,0 +1,84 @@
+# imports
+from psychopy import visual,core,event,clock,tools,monitors,sound
+import pylink as pl
+
+genpath = './../data/'
+dominance = 'Right'
+userid = 100
+
+# screen size
+screenSize = (1024,768)
+
+#eye tracking variables
+cd = 32 # color depth
+edf_fn = userid # EDF userID
+
+# Eyetracker functions
+#Initialize Eyetracker
+#Record the display resolution, so that the EyeLink tracker and Data Viewer will work in right display pixel coordinates.
+def eyeTrkInit (sp): # function to seet up tracker
+     	el = pl.EyeLink("100.1.1.1")
+     	el.sendCommand("screen_pixel_coords = 0 0 %d %d" %sp) #commands tell the Eyelink to do stuff (read the manual for details)
+     	el.sendMessage("DISPLAY_COORDS  0 0 %d %d" %sp) #messages tells Eyelink to record down that line into the log files.
+     	el.sendCommand("select_parser_configuration 0") #zero output both the raw data and the events, I think.
+     	el.sendCommand("scene_camera_gazemap = NO")
+     	el.sendCommand("pupil_size_diameter = %s"%("YES")) #yes, get every infomation tyou can ...
+     	return(el)
+
+#Calibrate Eyetracker
+#el is the name of the eyetracker object initialized above, screenXY is the tuble of screenX, screenY, and cd is color depth.
+def eyeTrkCalib (el,sp,cd):  # function to calibrate eyetracker - el is eytracker object, sp is screen position, cd calibration screen luminance (?)
+     #expWin.winHandle.minimize()
+     pl.openGraphics(sp,cd) # enable eyelink to control the display
+     pl.setCalibrationColors((255,255,255),(120,120,120)) # (target),(background)
+     pl.setTargetSize(int(sp[0]/70), int(sp[1]/300)) # size of the calibration target (is a hollow circle, I think the parameters are the inner and outer circle diameters (pixels?))
+     pl.setCalibrationSounds("","","")
+     pl.setDriftCorrectSounds("","off","off") # sounds are pretty irritating, definately don't want it in the experiment itself
+     el.doTrackerSetup() #Launches the 'Camera Setup' in Eyelink - from there do the calibration on the eyelink computer
+     pl.closeGraphics() # disable eyelink control of display
+
+#Open EDF datafile
+def eyeTrkOpenEDF (dfn,el):
+     el.openDataFile("test" + '.EDF')
+
+# circle stimuli
+def dotCircle(r,c) :
+    return(visual.Circle(win, radius = r, fillColor = c, units = 'deg'))
+
+def trial(coord,fs, drawCircle):
+    fs.draw()
+    win.flip()
+    core.wait(1)
+    fs.draw()
+    drawCircle.draw()
+    win.flip()
+    core.wait(1)
+
+monitorName = 'ExpMonitor'
+expMonitor = monitors.Monitor(monitorName)
+Reso = expMonitor.getSizePix()
+Resolution = (int(Reso[0]),int(Reso[1]))
+
+win = visual.Window(Resolution, color = [0,0,0], screen=0, fullscr = False, monitor = expMonitor, winType = 'pyglet', units = 'deg', waitBlanking = False, allowGUI = False)
+target = dotCircle(1,[1,-1,-1])
+target.pos = (0,0)
+peri = dotCircle(1,[-1,-1,1])
+peri.pos = (5,5)
+
+
+#Initializing and calibrating eye tracker
+eyelink = eyeTrkInit(Resolution)
+eyeTrkOpenEDF(edf_fn, eyelink)
+eyeTrkCalib(eyelink,Resolution,cd)
+eyelink.startRecording(1,1,1,1)
+
+for b in [0,1,2]:
+    if b != 0:
+        pl.openGraphics((1024,768),cd)
+        eyelink.doTrackerSetup() # in order to open the camera setup
+        pl.closeGraphics()
+        eyelink.startRecording(1,1,1,1)
+    for t in [0,1]:
+        trial((5,5),target, peri)
+
+core.quit()
